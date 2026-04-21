@@ -50,6 +50,7 @@ class TTSCallback(QwenTtsRealtimeCallback):
                     output=True,
                     frames_per_buffer=1024
                 )
+            """
             if self._v_stream is None and self._player is not None:
                 self._v_stream = self._player.open(
                     format=pyaudio.paInt16,
@@ -58,7 +59,7 @@ class TTSCallback(QwenTtsRealtimeCallback):
                     output=True,
                     frames_per_buffer=1024,
                     output_device_index=7
-                ) 
+                ) """
     
     def on_open(self) -> None:
         logger.info('[TTS] WebSocket 连接已建立')
@@ -90,11 +91,12 @@ class TTSCallback(QwenTtsRealtimeCallback):
                         self._stream.write(audio_data)
                     except Exception as e:
                         logger.warning(f"[TTS] 音频写入异常: {e}")
+                """
                 if self._v_stream:
                     try:
                         self._v_stream.write(audio_data)
                     except Exception as e:
-                        logger.warning(f"[TTS] 音频写入异常: {e}")
+                        logger.warning(f"[TTS] 音频写入异常: {e}")"""
                         
             elif event_type == 'response.done':
                 logger.info('[TTS] 响应生成完成')
@@ -118,7 +120,8 @@ class TTSCallback(QwenTtsRealtimeCallback):
         self.interrupt_event.clear()
         with self._lock:
             self._stream = None
-            self._v_stream = None
+            """
+            self._v_stream = None"""
         
     def wait_for_finished(self, timeout: Optional[float] = None) -> bool:
         """
@@ -138,13 +141,14 @@ class TTSCallback(QwenTtsRealtimeCallback):
                 except:
                     pass
                 self._stream = None
+            """
             if self._v_stream:
                 try:
                     self._v_stream.stop_stream()
                     self._v_stream.close()
                 except:
                     pass
-                self._stream = None
+                self._stream = None"""
             if self._player:
                 try:
                     self._player.terminate()
@@ -226,13 +230,14 @@ class TTSComponent(VTuberComponent):
                     return False
                 chunk = text[i:i + self.TEXT_CHUNK_SIZE]
                 tts.append_text(chunk)
-                time.sleep(0.03)  # 微小延迟，避免阻塞
             
             # 标记文本发送完成
             tts.finish()
             
             # 等待播放完成（带超时保护）
             completed = callback.wait_for_finished(timeout=60)
+            if completed:
+                time.sleep(0.3) # 等待缓冲区刷新
             return completed
             
         except Exception as e:
