@@ -208,25 +208,31 @@ class ChatLLMComponent(VTuberComponent):
                 logger.info("llm with no reply")
                 return
             
-            reply_text = json5.loads(reply_text)
-            say_text = reply_text.get("say", "")
-            if say_text:
-                # 发送给TTS组件
-                await self._send_to_tts(say_text)
-                self.is_speaking = True
-                await self._send_to_subtitle(say_text)
-            
-            annotation_text = reply_text.get("annotation", "")
-            reply_text = ""
-            if annotation_text:
-                reply_text += f"[annotation]{annotation_text}\n"
-            if say_text:
-                reply_text += f"[say]{say_text}\n"
-                
-            # 模式三：同时发送给PC_CONTROL_LLM
             if self.mode == "game_video":
+                import re
+                reply_text = re.search(r'\{[^{]*\}', reply_text).group()
+                reply_text = json5.loads(reply_text)
+                say_text = reply_text.get("say", "")
+                if say_text:
+                    # 发送给TTS组件
+                    await self._send_to_tts(say_text)
+                    self.is_speaking = True
+                    await self._send_to_subtitle(say_text)
+                
+                annotation_text = reply_text.get("annotation", "")
+                reply_text = ""
+                if annotation_text:
+                    reply_text += f"[annotation]{annotation_text}\n"
+                if say_text:
+                    reply_text += f"[say]{say_text}\n"
+
+                # 模式三：同时发送给PC_CONTROL_LLM
                 await self._send_to_pc_control(reply_text)
                 self.operate = True
+            else:
+                await self._send_to_tts(reply_text)
+                self.is_speaking = True
+                await self._send_to_subtitle(reply_text)
             
             # 更新对话上下文
             if self._current_input_text.strip():
@@ -336,7 +342,8 @@ class ChatLLMComponent(VTuberComponent):
 - 操作都是由你自己完成的。
 - {game}是一部番剧
 重要提示：
-- 当在番剧或视频播放时，你应该认真观看内容，减少直接发言，输出时'say':''，即say部分输出空字符串，并且吐槽频率必须小于每三轮对话吐槽一次。
+- 当在番剧或视频播放时，你应该认真观看内容，减少直接发言，输出时'say':''，即say部分输出空字符串.
+- 当在番剧或视频播放时，'say'有内容的频率必须小于每三轮对话一次。
 - 当不在播放番剧，你应该作为虚拟主播的身份，活跃气氛以及具体说出你需要做的事情，'say'部分可以增长一些。
 - 输出严格遵循json结构体输出
 
