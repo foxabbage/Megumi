@@ -9,7 +9,7 @@
 
 ## demo
 
-![demo video](video/demo.mp4)</br>
+![demo video](https://github.com/user-attachments/assets/8b90b4aa-0b6e-4c7a-85eb-4e6ed3a9579c)</br>
 限于电脑内存不够，此处没有同时使用Live2D演示。
 
 ## 如何使用？
