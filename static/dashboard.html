@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI VTuber 中控监控</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --card-bg: #16213e;
+            --text-color: #e94560;
+            --text-main: #ffffff;
+            --success: #4cc9f0;
+            --busy: #f72585;
+            --offline: #555;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { text-align: center; color: var(--text-color); margin-bottom: 10px; }
+        .system-info {
+            text-align: center;
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        
+        /* 状态网格 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.2s, border-color 0.2s;
+            border: 2px solid transparent;
+        }
+        .card:hover { transform: translateY(-3px); }
+        .card h3 { margin: 0 0 10px 0; font-size: 1em; word-break: break-all; }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--offline);
+            margin-right: 8px;
+        }
+        
+        .card.online { border-color: var(--success); }
+        .card.online .status-indicator { 
+            background-color: var(--success); 
+            box-shadow: 0 0 10px var(--success); 
+        }
+        
+        .card.busy { border-color: var(--busy); }
+        .card.busy .status-indicator { 
+            background-color: var(--busy); 
+            box-shadow: 0 0 10px var(--busy); 
+        }
+
+        .card.offline { opacity: 0.5; border-color: var(--offline); }
+        .card.offline .status-indicator { background-color: var(--offline); }
+
+        .card-info {
+            font-size: 0.75em;
+            color: #aaa;
+            margin-top: 10px;
+            text-align: left;
+        }
+        .card-info div { margin: 3px 0; }
+        .card-info label { color: #666; }
+
+        /* 日志区域 */
+        .log-section {
+            margin-top: 30px;
+        }
+        .log-section h3 {
+            color: var(--text-color);
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .log-container {
+            background-color: #000;
+            border-radius: 10px;
+            padding: 15px;
+            height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85em;
+            border: 1px solid #333;
+        }
+        .log-entry { 
+            margin-bottom: 6px; 
+            padding: 4px 8px;
+            border-left: 3px solid #333;
+            background: rgba(255,255,255,0.05);
+        }
+        .log-entry.type-text { border-left-color: var(--success); }
+        .log-entry.type-command { border-left-color: var(--busy); }
+        .log-entry.type-error { border-left-color: #ff4444; }
+        .log-entry.type-heartbeat { border-left-color: #888; }
+        
+        .log-time { color: #666; margin-right: 10px; font-size: 0.8em; }
+        .log-src { color: var(--success); font-weight: bold; }
+        .log-arrow { color: #666; margin: 0 5px; }
+        .log-target { color: var(--busy); font-weight: bold; }
+        .log-type { color: #888; font-size: 0.85em; }
+        .log-payload { color: #aaa; margin-left: 10px; }
+
+        /* 系统信息栏 */
+        .system-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 8px;
+        }
+        .system-bar-item {
+            text-align: center;
+        }
+        .system-bar-value {
+            font-size: 1.2em;
+            color: var(--success);
+            font-weight: bold;
+        }
+        .system-bar-label {
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        /* 连接状态 */
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .connection-status.connected {
+            background-color: rgba(76, 201, 240, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .connection-status.disconnected {
+            background-color: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="connectionStatus" class="connection-status disconnected">
+        ● unconnected
+    </div>
+
+    <h1> AI VTuber dashboard</h1>
+    
+    <div class="system-info" id="systemInfo">
+        connecting...
+    </div>
+
+    <div class="system-bar">
+        <div class="system-bar-item">
+            <div class="system-bar-value" id="activeCount">0</div>
+            <div class="system-bar-label">online components</div>
+        </div>
+        <div class="system-bar-item">
+            <div class="system-bar-value" id="uptimeValue">0s</div>
+            <div class="system-bar-label">running time</div>
+        </div>
+        <div class="system-bar-item">
+            <div class="system-bar-value" id="msgCount">0</div>
+            <div class="system-bar-label">message number</div>
+        </div>
+    </div>
+
+    <h3 style="color: var(--text-color);">components</h3>
+    <div id="statusGrid" class="grid-container">
+        <!-- 组件卡片将在这里生成 -->
+    </div>
+
+    <div class="log-section">
+        <h3>Stream log</h3>
+        <div id="logConsole" class="log-container"></div>
+    </div>
+
+    <script>
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
+        
+        const grid = document.getElementById('statusGrid');
+        const logConsole = document.getElementById('logConsole');
+        const systemInfo = document.getElementById('systemInfo');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const activeCountEl = document.getElementById('activeCount');
+        const uptimeEl = document.getElementById('uptimeValue');
+        const msgCountEl = document.getElementById('msgCount');
+        
+        let componentData = {};
+        let totalMsgCount = 0;
+
+        // 连接 WebSocket
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            updateConnectionStatus(true);
+            addLog("System", "Connected to Core", "heartbeat");
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'snapshot' || data.type === 'update') {
+                    // ✅ 关键修复：正确解析数据结构
+                    if (data.data.components) {
+                        updateGrid(data.data.components);
+                    }
+                    if (data.data.system) {
+                        updateSystemInfo(data.data.system);
+                    }
+                    if (data.type === 'snapshot' && data.data.logs) {
+                        // 初始快照时加载历史日志
+                        data.data.logs.forEach(log => addLogFromData(log));
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to parse message:", e);
+            }
+        };
+
+        ws.onclose = () => {
+            updateConnectionStatus(false);
+            addLog("System", "Disconnected from Core", "error");
+            systemInfo.textContent = "连接断开，5 秒后重试...";
+            setTimeout(() => location.reload(), 5000);
+        };
+
+        ws.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            updateConnectionStatus(false);
+        };
+
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                connectionStatus.className = "connection-status connected";
+                connectionStatus.textContent = "● 已连接";
+            } else {
+                connectionStatus.className = "connection-status disconnected";
+                connectionStatus.textContent = "● 未连接";
+            }
+        }
+
+        function updateSystemInfo(system) {
+            if (system.active_components_count !== undefined) {
+                activeCountEl.textContent = system.active_components_count;
+            }
+            if (system.uptime_seconds !== undefined) {
+                const seconds = Math.floor(system.uptime_seconds);
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                uptimeEl.textContent = `${h}h ${m}m ${s}s`;
+            }
+            systemInfo.textContent = `系统运行正常 | 最后更新：${new Date().toLocaleTimeString()}`;
+        }
+
+        function updateGrid(components) {
+            componentData = { ...componentData, ...components };
+            grid.innerHTML = '';
+            
+            let msgTotal = 0;
+            
+            for (const [id, info] of Object.entries(componentData)) {
+                const card = document.createElement('div');
+                const statusClass = info.status || 'offline';
+                card.className = `card ${statusClass}`;
+                
+                const displayName = id.replace(/_/g, ' ').toUpperCase();
+                const msgCount = info.message_count || 0;
+                msgTotal += msgCount;
+                
+                const lastSeen = info.last_seen ? 
+                    new Date(info.last_seen).toLocaleTimeString() : 'N/A';
+                
+                card.innerHTML = `
+                    <h3><span class="status-indicator"></span>${displayName}</h3>
+                    <div class="card-info">
+                        <div><label>状态:</label> ${info.status || 'unknown'}</div>
+                        <div><label>最后活动:</label> ${lastSeen}</div>
+                        <div><label>消息类型:</label> ${info.last_msg_type || 'N/A'}</div>
+                        <div><label>消息数:</label> ${msgCount}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+            
+            msgCountEl.textContent = msgTotal;
+        }
+
+        function addLogFromData(logData) {
+            addLog(logData.source, logData.target, logData.type, logData.payload);
+        }
+
+        function addLog(src, target, type, payload) {
+            const div = document.createElement('div');
+            div.className = `log-entry type-${type.toLowerCase()}`;
+            
+            const time = new Date().toLocaleTimeString();
+            const payloadStr = payload ? 
+                `<span class="log-payload">${JSON.stringify(payload).substring(0, 80)}${JSON.stringify(payload).length > 80 ? '...' : ''}</span>` 
+                : '';
+            
+            div.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-src">${src}</span>
+                <span class="log-arrow">→</span>
+                <span class="log-target">${target}</span>
+                <span class="log-type">[${type}]</span>
+                ${payloadStr}
+            `;
+            
+            logConsole.prepend(div);
+            
+            // 限制日志数量
+            while (logConsole.children.length > 50) {
+                logConsole.removeChild(logConsole.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>
